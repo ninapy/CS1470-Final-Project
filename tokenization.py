@@ -66,9 +66,11 @@ token_transforms = {
 }
 
 # Build vocabularies
+#creates dictionaries (one per language) that map tokens to indices like "Zwei" → 12
 vocab_transforms = build_vocabulary(train_filepaths, token_transforms)
 
 # Create tensor transforms
+#returns a new function that applies each transform in sequence
 def sequential_transforms(*transforms):
     def func(txt_input):
         for transform in transforms:
@@ -103,10 +105,18 @@ en_tokens = text_transforms['en'](en_text)
 
 print(f"German tokens: {de_tokens}")
 print(f"English tokens: {en_tokens}")
-
+#example:
+# <unk>: 0
+# <pad>: 1
+# <sos>: 2
+# <eos>: 3
+# 'the': 4
+# 'cat': 5
+# '.': 6
+# 'dog': 7
+#Then the sentence "The dog saw the cat." would become:
+#[2, 4, 7, 0, 4, 5, 6, 3]
 
 #TODO:
 # Create a dataset class that loads all the data
 # Implement batching with padding for variable-length sequences
-# Build the Transformer model architecture
-# Set up the training loop
