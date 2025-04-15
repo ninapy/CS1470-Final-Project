@@ -1,10 +1,9 @@
 # Requirements.txt
-torch>=1.7.0
-torchtext>=0.8.0
-spacy>=3.0.0
-numpy==1.24.0  # Specific version to avoid the NumPy 2.x conflict you encountered
-tqdm  # For progress bars during training
+spacy==3.7.2
+numpy==1.24.0 # Specific version to avoid the NumPy 2.x conflict you encountered
+tqdm==4.66.1
+torch>=2.0.0
 
-#others
+#other libraries important for tokenization
 # python -m spacy download en_core_web_sm
 # python -m spacy download de_core_news_sm
