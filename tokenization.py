@@ -228,8 +228,7 @@ for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
         #finally add SOS/EOS and create tensor
         lambda token_ids: tensor_transform(vocab_transforms[ln], token_ids)
     )
- # Example usage with full pipeline
-# Example usage - Test the transformation pipeline
+#example usage with full pipeline
 de_text = "Zwei Männer unterhalten sich, während sie in einer Küche kochen."
 en_text = "Two men are talking while they are cooking in a kitchen."
 # Apply transformation pipelines to convert text to token indices
