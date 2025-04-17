@@ -165,3 +165,209 @@ class PositionwiseFeedForward(nn.Module):
 
 
 #UP NEXT (04/15/25): E_LAYER -> ENCODER -> D_LAYER -> DECODER -> TRANSFORMER MODEL
+
+
+# Encoder Layer
+class EncoderLayer(nn.Module):
+    """
+    Single Transformer encoder layer, made up of:
+      - Multi-Head Self-Attention (with residual & layer norm)
+      - Position-wise Feed Forward (with residual & layer norm)
+    """
+    def __init__(self, d_model: int, n_heads: int, dim_feedforward: int, dropout: float):
+        super(EncoderLayer, self).__init__()
+        self.self_attn = MultiHeadAttention(d_model, n_heads, dropout)
+        self.ff = PositionwiseFeedForward(d_model, dim_feedforward, dropout)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, src: torch.Tensor, src_mask: torch.Tensor = None):
+        """
+        Args:
+            src: [batch_size, src_len, d_model]
+            src_mask: [batch_size, 1, src_len, src_len] (optional)
+        Returns:
+            Encoded output of shape [batch_size, src_len, d_model].
+        """
+        # Self-attention sub-layer
+        attn_output, _ = self.self_attn(src, src, src, mask=src_mask)
+        src = self.norm1(src + self.dropout(attn_output))
+
+        # Position-wise feed-forward sub-layer
+        ff_output = self.ff(src)
+        src = self.norm2(src + self.dropout(ff_output))
+        return src
+
+
+# Encoder
+class Encoder(nn.Module):
+    """
+    Transformer Encoder that stacks multiple EncoderLayer layers.
+    """
+    def __init__(self,
+                 input_dim: int,
+                 d_model: int,
+                 n_layers: int,
+                 n_heads: int,
+                 dim_feedforward: int,
+                 dropout: float,
+                 max_len: int = 5000):
+        super(Encoder, self).__init__()
+        self.d_model = d_model
+
+        # Token embedding
+        self.embed_tokens = nn.Embedding(input_dim, d_model)
+
+        # Positional encoding
+        self.pos_encoding = PositionalEncoding(d_model, max_len)
+
+        # Dropout after embedding
+        self.dropout = nn.Dropout(dropout)
+
+        # Stack of EncoderLayers
+        self.layers = nn.ModuleList([
+            EncoderLayer(d_model, n_heads, dim_feedforward, dropout)
+            for _ in range(n_layers)
+        ])
+
+    def forward(self, src: torch.Tensor, src_mask: torch.Tensor = None):
+        """
+        Args:
+            src: [batch_size, src_len]  (token indices)
+            src_mask: [batch_size, 1, src_len, src_len]
+        Returns:
+            Encoded representations: [batch_size, src_len, d_model]
+        """
+        #Embed tokens + scale
+        src_embed = self.embed_tokens(src) * math.sqrt(self.d_model)
+        #Add positional encoding
+        src_embed = self.pos_encoding(src_embed)
+        #Apply dropout
+        src_embed = self.dropout(src_embed)
+
+        # Pass through each layer
+        out = src_embed
+        for layer in self.layers:
+            out = layer(out, src_mask)
+
+        return out
+    
+
+
+# Decoder Layer
+class DecoderLayer(nn.Module):
+    """
+    Single Transformer decoder layer, made up of:
+      - Masked Multi-Head Self-Attention (with residual & layer norm)
+      - Multi-Head Attention over Encoder output (with residual & layer norm)
+      - Position-wise Feed Forward (with residual & layer norm)
+    """
+    def __init__(self, d_model: int, n_heads: int, dim_feedforward: int, dropout: float):
+        super(DecoderLayer, self).__init__()
+        # self-attention for the target tokens
+        self.self_attn = MultiHeadAttention(d_model, n_heads, dropout)
+        # cross-attention: query is the decoder, key/value is the encoder output
+        self.cross_attn = MultiHeadAttention(d_model, n_heads, dropout)
+        self.ff = PositionwiseFeedForward(d_model, dim_feedforward, dropout)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, tgt: torch.Tensor, enc_out: torch.Tensor,
+                tgt_mask: torch.Tensor = None, src_mask: torch.Tensor = None):
+        """
+        Args:
+            tgt: [batch_size, tgt_len, d_model]
+            enc_out: [batch_size, src_len, d_model]
+            tgt_mask: [batch_size, 1, tgt_len, tgt_len]
+            src_mask: [batch_size, 1, 1, src_len]
+        Returns:
+            (out, attn_weights) 
+            out: shape [batch_size, tgt_len, d_model]
+            attn_weights: optional, for analyzing cross-attention
+        """
+        #Masked self-attention
+        self_attn_out, _ = self.self_attn(tgt, tgt, tgt, mask=tgt_mask)
+        x = self.norm1(tgt + self.dropout(self_attn_out))
+
+        #Encoder-Decoder cross-attention
+        cross_attn_out, attn_weights = self.cross_attn(x, enc_out, enc_out, mask=src_mask)
+        x = self.norm2(x + self.dropout(cross_attn_out))
+
+        #Position-wise feed forward
+        ff_out = self.ff(x)
+        out = self.norm3(x + self.dropout(ff_out))
+
+        return out, attn_weights
+
+
+# Decoder
+class Decoder(nn.Module):
+    """
+    Transformer Decoder that stacks multiple DecoderLayer layers.
+    """
+    def __init__(self,
+                 output_dim: int,
+                 d_model: int,
+                 n_layers: int,
+                 n_heads: int,
+                 dim_feedforward: int,
+                 dropout: float,
+                 max_len: int = 5000):
+        super(Decoder, self).__init__()
+        self.d_model = d_model
+
+        # Embedding for the target tokens
+        self.embed_tokens = nn.Embedding(output_dim, d_model)
+
+        # Positional encoding
+        self.pos_encoding = PositionalEncoding(d_model, max_len)
+
+        # Dropout after embedding
+        self.dropout = nn.Dropout(dropout)
+
+        # Stack of DecoderLayers
+        self.layers = nn.ModuleList([
+            DecoderLayer(d_model, n_heads, dim_feedforward, dropout)
+            for _ in range(n_layers)
+        ])
+
+        # Final linear layer to map to output vocab
+        self.fc_out = nn.Linear(d_model, output_dim)
+
+    def forward(self, tgt: torch.Tensor, enc_out: torch.Tensor,
+                tgt_mask: torch.Tensor = None, src_mask: torch.Tensor = None):
+        """
+        Args:
+            tgt: [batch_size, tgt_len]
+            enc_out: [batch_size, src_len, d_model]
+            tgt_mask: [batch_size, 1, tgt_len, tgt_len] (future masking + pad)
+            src_mask: [batch_size, 1, 1, src_len]       (source pad mask)
+        Returns:
+            (logits, attention) 
+            logits: [batch_size, tgt_len, output_dim]
+            attention: attention weights from the final DecoderLayer 
+        """
+        #Embed + scale
+        tgt_embed = self.embed_tokens(tgt) * math.sqrt(self.d_model)
+
+        #Add position encodings
+        tgt_embed = self.pos_encoding(tgt_embed)
+        tgt_embed = self.dropout(tgt_embed)
+
+        #Pass through each layer
+        out = tgt_embed
+        attn_weights = None
+        for layer in self.layers:
+            out, attn_weights = layer(out, enc_out, tgt_mask, src_mask)
+
+        #Project hidden states to vocab logits
+        logits = self.fc_out(out)
+
+        return logits, attn_weights
+
+#UP NEXT (04/17/25): -> TRANSFORMER MODEL
