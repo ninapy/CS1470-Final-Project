@@ -371,3 +371,86 @@ class Decoder(nn.Module):
         return logits, attn_weights
 
 #UP NEXT (04/17/25): -> TRANSFORMER MODEL
+
+
+# Full Transformer 
+class TransformerModel(nn.Module):
+    """
+    Complete Transformer: an Encoder and a Decoder, with the ability to
+    generate source/target masks based on pad tokens or future tokens.
+    """
+    def __init__(self, 
+                 src_vocab_size: int, 
+                 tgt_vocab_size: int, 
+                 d_model: int = 512, 
+                 n_layers: int = 6, 
+                 n_heads: int = 8,
+                 dim_feedforward: int = 2048,
+                 dropout: float = 0.1,
+                 src_pad_idx: int = 1, 
+                 tgt_pad_idx: int = 1, 
+                 max_len: int = 5000,
+                 device: str = "cuda" if torch.cuda.is_available() else "cpu"):
+        super(TransformerModel, self).__init__()
+        self.device = device
+        self.src_pad_idx = src_pad_idx
+        self.tgt_pad_idx = tgt_pad_idx
+
+        self.encoder = Encoder(src_vocab_size, d_model, n_layers, n_heads,
+                               dim_feedforward, dropout, max_len)
+        self.decoder = Decoder(tgt_vocab_size, d_model, n_layers, n_heads,
+                               dim_feedforward, dropout, max_len)
+
+        self.to(device)
+
+    def make_src_mask(self, src: torch.Tensor) -> torch.Tensor:
+        """
+        Creates a binary mask for the source sequence to ignore PAD tokens.
+
+        Args:
+            src: [batch_size, src_len]
+        Returns:
+            src_mask: [batch_size, 1, 1, src_len]
+        """
+
+        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
+        return src_mask
+
+    def make_tgt_mask(self, tgt: torch.Tensor) -> torch.Tensor:
+        """
+        Creates a mask for the target sequence to:
+            1) ignore PAD tokens,
+            2) apply subsequent/future masking so we don't look ahead.
+        
+        Args:
+            tgt: [batch_size, tgt_len]
+        Returns:
+            tgt_mask: [batch_size, 1, tgt_len, tgt_len]
+        """
+        B, tgt_len = tgt.shape
+        # Pad mask
+        pad_mask = (tgt != self.tgt_pad_idx).unsqueeze(1).unsqueeze(2)  
+
+        # Subsequent mask (no looking ahead)
+        subsequent_mask = torch.tril(torch.ones((tgt_len, tgt_len), device=tgt.device)).bool()
+        subsequent_mask = subsequent_mask.unsqueeze(0).unsqueeze(1)  
+
+        tgt_mask = pad_mask & subsequent_mask
+        return tgt_mask
+
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor):
+        """
+        Args:
+            src: [batch_size, src_len]
+            tgt: [batch_size, tgt_len]
+        Returns:
+            (logits, attention)
+            logits: [batch_size, tgt_len, tgt_vocab_size]
+            attention: attention from the final decoder layer
+        """
+        src_mask = self.make_src_mask(src)
+        tgt_mask = self.make_tgt_mask(tgt)
+
+        enc_out = self.encoder(src, src_mask)
+        logits, attention = self.decoder(tgt, enc_out, tgt_mask, src_mask)
+        return logits, attention
