@@ -1,8 +1,14 @@
 # Requirements.txt
 spacy==3.7.2
-numpy==1.24.0 # Specific version to avoid the NumPy 2.x conflict you encountered
+numpy==1.24.0 #specific version to avoid the NumPy 2.x conflict you encountered
 tqdm==4.66.1
 torch>=2.0.0
+
+sounddevice>=0.4.6 #to record audio from microphone
+soundfile>=0.12.1 #saves and reads audio files
+gtts>=2.3.2 #Google Text-to-Speech
+faster-whisper>=0.9.0 # OpenAI’s Whisper, speech-to-text transcription
+ipython>=8.12.0  # for playing back audio
 
 #other libraries important for tokenization
 # python -m spacy download en_core_web_sm

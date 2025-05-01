@@ -55,10 +55,10 @@
       transform: translateY(-50%);
     }
     .left-arrow {
-      left: 300px;
+      left: 180px;
     }
     .right-arrow {
-      right: 300px;
+      right: 180px;
     }
     #textInput {
       width: 60%;
@@ -139,7 +139,7 @@
     function startRecording() {
       const btn = document.getElementById('recordBtn');
       btn.classList.add('recording');
-      btn.textContent = '🎤 Recording for 3 seconds...';
+      btn.textContent = '🎤 Recording for 5 seconds...';
 
       fetch('/run-translation')
         .then(response => response.json())
