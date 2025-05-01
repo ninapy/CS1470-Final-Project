@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>You just want Attention!</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fafafa;
+      text-align: center;
+    }
+    h1 {
+      color: #333;
+    }
+    p {
+      color: #555;
+      max-width: 600px;
+      margin: 0 auto 2px;
+    }
+    img {
+      height: 240px;
+      width: auto;
+      margin: 10px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    #image-container {
+      margin-bottom: 2px;
+      position: relative;
+    }
+    #recordBtn, #translateBtn {
+      padding: 8px 15px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      margin: 5px;
+    }
+    #recordBtn.recording {
+      background-color: red;
+    }
+    #recordBtn:hover, #translateBtn:hover {
+      background-color: #0056b3;
+    }
+    .arrow {
+      font-size: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .left-arrow {
+      left: 300px;
+    }
+    .right-arrow {
+      right: 300px;
+    }
+    #textInput {
+      width: 60%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-top: 2px;
+    }
+    #resultBox {
+      margin-top: 2px;
+      padding: 10px;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>You just want Attention!</h1>
+  <p>A re-implementation in PyTorch of the renowned “Attention Is All You Need” paper using the Multi30K Dataset, enhanced with Whisper AI for DE→EN translation.</p>
+
+  <div id="image-container">
+    <button class="arrow left-arrow" onclick="changeImage(-1)">&#8592;</button>
+    <img id="mainImage" src="" alt="Flickr8k Image">
+    <button class="arrow right-arrow" onclick="changeImage(1)">&#8594;</button>
+  </div>
+
+  <button id="recordBtn" onclick="startRecording()">🎤 Record & Translate</button>
+
+  <div>
+    <input type="text" id="textInput" placeholder="Oder geben Sie einen deutschen Satz ein...">
+    <button id="translateBtn" onclick="translateText()">🌍 Translate Text</button>
+  </div>
+
+  <div id="resultBox"></div>
+
+  <script>
+    const images = [...document.querySelectorAll("img")];
+    const imageFilenames = [
+      'static/img1.jpg',
+      'static/img2.jpg',
+      'static/img3.jpg',
+      'static/img4.jpg',
+      'static/img5.jpg',
+      'static/img6.jpg',
+      'static/img7.jpg',
+      'static/img8.jpg',
+      'static/img9.jpg',
+      'static/img10.jpg',
+      'static/img11.jpg',
+      'static/img12.jpg'
+    ];
+    let currentIndex = Math.floor(Math.random() * imageFilenames.length);
+
+    function showImage(index) {
+      const img = document.getElementById("mainImage");
+      img.src = imageFilenames[index];
+    }
+
+    function changeImage(offset) {
+      currentIndex = (currentIndex + offset + imageFilenames.length) % imageFilenames.length;
+      showImage(currentIndex);
+    }
+
+    function autoChangeImage() {
+      changeImage(5);
+    }
+
+    function showResult(text) {
+      const box = document.getElementById('resultBox');
+      box.innerText = text;
+      box.style.display = 'block';
+      setTimeout(() => box.style.display = 'none', 8000);
+    }
+
+    function startRecording() {
+      const btn = document.getElementById('recordBtn');
+      btn.classList.add('recording');
+      btn.textContent = '🎤 Recording for 3 seconds...';
+
+      fetch('/run-translation')
+        .then(response => response.json())
+        .then(data => {
+          btn.classList.remove('recording');
+          btn.textContent = '🎤 Record & Translate';
+
+          const message = "German: " + (data.german || '[No input]') + "\nEnglish: " + (data.translation || '[No translation]');
+          showResult(message);
+
+          if (data.audio_url) {
+            const audio = new Audio(data.audio_url);
+            audio.play().catch(() => showResult("🔇 Audio failed to play."));
+          }
+        })
+        .catch(err => {
+          btn.classList.remove('recording');
+          btn.textContent = '🎤 Record & Translate';
+          showResult("Error: " + err);
+        });
+    }
+
+    function translateText() {
+      const text = document.getElementById('textInput').value;
+      fetch(`/translate-text?sentence=${encodeURIComponent(text)}`)
+        .then(response => response.json())
+        .then(data => {
+          showResult("German: " + text + "\nEnglish: " + (data.translation || '[No translation]'));
+        })
+        .catch(err => showResult("Error: " + err));
+    }
+
+    window.onload = () => {
+      showImage(currentIndex);
+      setInterval(autoChangeImage, 5000);
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Requirements.txt
+spacy==3.7.2
+numpy==1.24.0 # Specific version to avoid the NumPy 2.x conflict you encountered
+tqdm==4.66.1
+torch>=2.0.0
+
+#other libraries important for tokenization
+# python -m spacy download en_core_web_sm
+# python -m spacy download de_core_news_sm
